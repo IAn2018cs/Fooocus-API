@@ -187,7 +187,7 @@ def generation_output(results: QueueTask | List[ImageGenerationResult], streamin
             return Response(status_code=500, content=result.finish_reason.value)
         
         bytes = output_file_to_bytesimg(results[0].im)
-        return Response(bytes, media_type='image/png')
+        return Response(bytes, media_type='image/webp')
     else:
         results = [GeneratedImageResult(
             base64=output_file_to_base64img(
