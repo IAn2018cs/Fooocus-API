@@ -87,4 +87,5 @@ def create_output_file_name() -> str:
     file_path = os.path.join(output_dir, filename)
 
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    open(file_path, 'x')
     return filename
