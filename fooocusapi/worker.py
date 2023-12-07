@@ -5,9 +5,10 @@ import numpy as np
 import torch
 import re
 from typing import List
-from fooocusapi.file_utils import save_output_file
+from fooocusapi.file_utils import save_output_file, output_file_to_file_path, create_output_file_name
 from fooocusapi.parameters import GenerationFinishReason, ImageGenerationParams, ImageGenerationResult
 from fooocusapi.task_queue import QueueTask, TaskQueue, TaskOutputs
+from facefusion.core import run
 
 
 task_queue = TaskQueue(queue_size=3, hisotry_size=6)
@@ -67,6 +68,20 @@ def process_generate(async_task: QueueTask, params: ImageGenerationParams) -> Li
         print(f'[Fooocus] {text}')
         outputs.append(['preview', (number, text, None)])
 
+    def swap_face(img_filename):
+        source_file = None
+        for img_prompt in params.image_prompts:
+            cn_img, cn_stop, cn_weight, cn_type = img_prompt
+            if flags.cn_ip_face == cn_type:
+                source_file = output_file_to_file_path(save_output_file(cn_img))
+                break
+        if source_file:
+            new_img_filename = create_output_file_name()
+            new_img = run(source_file, output_file_to_file_path(img_filename), output_file_to_file_path(new_img_filename))
+            if new_img:
+                return new_img_filename
+        return img_filename
+
     def yield_result(_, imgs, tasks):
         if not isinstance(imgs, list):
             imgs = [imgs]
@@ -75,7 +90,7 @@ def process_generate(async_task: QueueTask, params: ImageGenerationParams) -> Li
         for i, im in enumerate(imgs):
             seed = -1 if len(tasks) == 0 else tasks[i]['task_seed']
             img_filename = save_output_file(im)
-            results.append(ImageGenerationResult(im=img_filename, seed=str(seed), finish_reason=GenerationFinishReason.success))
+            results.append(ImageGenerationResult(im=swap_face(img_filename), seed=str(seed), finish_reason=GenerationFinishReason.success))
         async_task.set_result(results, False)
         task_queue.finish_task(async_task.seq)
         print(f"[Task Queue] Finish task, seq={async_task.seq}")

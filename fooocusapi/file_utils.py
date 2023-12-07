@@ -68,3 +68,23 @@ def get_file_serve_url(filename: str | None) -> str | None:
     if filename is None:
         return None
     return static_serve_base_url + filename.replace('\\', '/')
+
+
+def output_file_to_file_path(filename: str | None) -> str | None:
+    if filename is None:
+        return None
+    file_path = os.path.join(output_dir, filename)
+    if not os.path.exists(file_path) or not os.path.isfile(file_path):
+        return None
+    return file_path
+
+
+def create_output_file_name() -> str:
+    current_time = datetime.datetime.now()
+    date_string = current_time.strftime("%Y-%m-%d")
+
+    filename = os.path.join(date_string, str(uuid.uuid4()) + '.png')
+    file_path = os.path.join(output_dir, filename)
+
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    return filename
