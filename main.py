@@ -283,6 +283,10 @@ def prepare_environments(args) -> bool:
 
         sys.argv.append('--preset')
         sys.argv.append(args.preset)
+
+    if args.enable_smart_memory:
+        sys.argv.append('--enable-smart-memory')
+
     import modules.config as config
     import modules.flags as flags
     import fooocusapi.parameters as parameters
@@ -306,7 +310,7 @@ def prepare_environments(args) -> bool:
 
     return True
 
-def pre_setup(skip_sync_repo: bool=False, disable_private_log: bool=False, skip_pip=False, load_all_models: bool=False, preload_pipeline: bool=False, preset: str | None=None):
+def pre_setup(skip_sync_repo: bool=False, disable_private_log: bool=False, skip_pip=False, load_all_models: bool=False, preload_pipeline: bool=False, preset: str | None=None, enable_smart_memory: bool=False):
     class Args(object):
         host = '127.0.0.1'
         port = 8888
@@ -318,6 +322,7 @@ def pre_setup(skip_sync_repo: bool=False, disable_private_log: bool=False, skip_
         queue_size = 3
         queue_history = 100
         preset = None
+        enable_smart_memory = False
 
     print("[Pre Setup] Prepare environments")
 
@@ -325,6 +330,7 @@ def pre_setup(skip_sync_repo: bool=False, disable_private_log: bool=False, skip_
     args.disable_private_log = disable_private_log
     args.preload_pipeline = preload_pipeline
     args.preset = preset
+    args.enable_smart_memory = enable_smart_memory
     if skip_sync_repo:
         args.sync_repo = 'skip'
     prepare_environments(args)
@@ -371,6 +377,7 @@ if __name__ == "__main__":
     parser.add_argument("--queue-size", type=int, default=3, help="Working queue size, default: 3, generation requests exceeding working queue size will return failure")
     parser.add_argument("--queue-history", type=int, default=100, help="Finished jobs reserve size, tasks exceeding the limit will be deleted, including output image files, default: 100")
     parser.add_argument("--preset", type=str, default=None, help="Apply specified UI preset.")
+    parser.add_argument("--enable-smart-memory",  default=False, action="store_true", help="Force loading models to vram when the unload can be avoided.")
 
 
     args = parser.parse_args()
