@@ -150,7 +150,7 @@ def req_to_params(req: Text2ImgRequest) -> ImageGenerationParams:
                                  )
 
 
-def generation_output(results: QueueTask | List[ImageGenerationResult], streaming_output: bool, require_base64: bool, require_step_preivew: bool=False) -> Response | List[GeneratedImageResult] | AsyncJobResponse:
+def generation_output(results: QueueTask | List[ImageGenerationResult], streaming_output: bool, require_base64: bool, use_webp: bool, require_step_preivew: bool=False) -> Response | List[GeneratedImageResult] | AsyncJobResponse:
     if isinstance(results, QueueTask):
         task = results
         job_stage = AsyncJobStage.running
@@ -167,7 +167,7 @@ def generation_output(results: QueueTask | List[ImageGenerationResult], streamin
                     if 'require_base64' in task.req_param and task.req_param['require_base64']:
                         task_result_require_base64 = True
 
-                    job_result = generation_output(task.task_result, False, task_result_require_base64)
+                    job_result = generation_output(task.task_result, False, task_result_require_base64, use_webp)
         job_step_preview = None if not require_step_preivew else task.task_step_preview
         return AsyncJobResponse(job_id=task.seq,
                                 job_type=task.type,
@@ -188,12 +188,16 @@ def generation_output(results: QueueTask | List[ImageGenerationResult], streamin
         elif result.finish_reason == GenerationFinishReason.error:
             return Response(status_code=500, content=result.finish_reason.value)
         
-        bytes = output_file_to_bytesimg(results[0].im)
-        return Response(bytes, media_type='image/webp')
+        bytes = output_file_to_bytesimg(results[0].im, use_webp=use_webp)
+        if use_webp:
+            media_type = 'image/webp'
+        else:
+            media_type = 'image/png'
+        return Response(bytes, media_type=media_type)
     else:
         results = [GeneratedImageResult(
             base64=output_file_to_base64img(
-                item.im) if require_base64 else None,
+                item.im, use_webp=use_webp) if require_base64 else None,
             url=get_file_serve_url(item.im),
             seed=item.seed,
             finish_reason=item.finish_reason) for item in results]

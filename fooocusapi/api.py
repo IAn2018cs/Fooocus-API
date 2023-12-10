@@ -68,7 +68,7 @@ def call_worker(req: Text2ImgRequest, accept: str):
 
     params = req_to_params(req)
     queue_task = task_queue.add_task(
-        task_type, {'params': params.__dict__, 'accept': accept, 'require_base64': req.require_base64})
+        task_type, {'params': params.__dict__, 'accept': accept, 'require_base64': req.require_base64, 'use_webp': req.use_webp})
 
     if queue_task is None:
         print("[Task Queue] The task queue has reached limit")
@@ -104,7 +104,7 @@ def text2img_generation(req: Text2ImgRequest, accept: str = Header(None),
         streaming_output = False
 
     results = call_worker(req, accept)
-    return generation_output(results, streaming_output, req.require_base64)
+    return generation_output(results, streaming_output, req.require_base64, req.use_webp)
 
 
 @app.post("/v1/generation/image-upscale-vary", response_model=List[GeneratedImageResult] | AsyncJobResponse, responses=img_generate_responses)
@@ -122,7 +122,7 @@ def img_upscale_or_vary(input_image: UploadFile, req: ImgUpscaleOrVaryRequest = 
         streaming_output = False
 
     results = call_worker(req, accept)
-    return generation_output(results, streaming_output, req.require_base64)
+    return generation_output(results, streaming_output, req.require_base64, req.use_webp)
 
 
 @app.post("/v2/generation/image-upscale-vary", response_model=List[GeneratedImageResult] | AsyncJobResponse, responses=img_generate_responses)
@@ -141,7 +141,7 @@ def img_upscale_or_vary_v2(req: ImgUpscaleOrVaryRequestJson,
     req.input_image = base64_to_stream(req.input_image)
 
     results = call_worker(req, accept)
-    return generation_output(results, streaming_output, req.require_base64)
+    return generation_output(results, streaming_output, req.require_base64, req.use_webp)
 
 
 @app.post("/v1/generation/image-inpait-outpaint", response_model=List[GeneratedImageResult] | AsyncJobResponse, responses=img_generate_responses)
@@ -159,7 +159,7 @@ def img_inpaint_or_outpaint(input_image: UploadFile, req: ImgInpaintOrOutpaintRe
         streaming_output = False
 
     results = call_worker(req, accept)
-    return generation_output(results, streaming_output, req.require_base64)
+    return generation_output(results, streaming_output, req.require_base64, req.use_webp)
 
 
 @app.post("/v2/generation/image-inpait-outpaint", response_model=List[GeneratedImageResult] | AsyncJobResponse, responses=img_generate_responses)
@@ -180,7 +180,7 @@ def img_inpaint_or_outpaint_v2(req: ImgInpaintOrOutpaintRequestJson,
     if req.input_mask is not None:
         req.input_mask = base64_to_stream(req.input_mask)
     results = call_worker(req, accept)
-    return generation_output(results, streaming_output, req.require_base64)
+    return generation_output(results, streaming_output, req.require_base64, req.use_webp)
 
 
 @app.post("/v1/generation/image-prompt", response_model=List[GeneratedImageResult] | AsyncJobResponse, responses=img_generate_responses)
@@ -199,7 +199,7 @@ def img_prompt(cn_img1: Optional[UploadFile] = File(None),
         streaming_output = False
 
     results = call_worker(req, accept)
-    return generation_output(results, streaming_output, req.require_base64)
+    return generation_output(results, streaming_output, req.require_base64, req.use_webp)
 
 
 @app.post("/v2/generation/image-prompt", response_model=List[GeneratedImageResult] | AsyncJobResponse, responses=img_generate_responses)
@@ -232,7 +232,7 @@ def img_prompt(req: ImgPromptRequestJson,
     req.image_prompts = image_prompts_files
 
     results = call_worker(req, accept)
-    return generation_output(results, streaming_output, req.require_base64)
+    return generation_output(results, streaming_output, req.require_base64, req.use_webp)
 
 
 @app.get("/v1/generation/query-job", response_model=AsyncJobResponse, description="Query async generation job")
@@ -241,7 +241,7 @@ def query_job(req: QueryJobRequest=Depends()):
     if queue_task is None:
         return Response(content="Job not found", status_code=404)
 
-    return generation_output(queue_task, streaming_output=False, require_base64=False, require_step_preivew=req.require_step_preivew)
+    return generation_output(queue_task, streaming_output=False, require_base64=False, use_webp=False, require_step_preivew=req.require_step_preivew)
 
 
 @app.get("/v1/generation/job-queue", response_model=JobQueueInfo, description="Query job queue info")

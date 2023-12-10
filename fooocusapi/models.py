@@ -117,6 +117,7 @@ class Text2ImgRequest(BaseModel):
     advanced_params: AdvancedParams | None = Field(deafult=None, description="Advanced parameters")
     require_base64: bool = Field(default=False, description="Return base64 data of generated image")
     async_process: bool = Field(default=False, description="Set to true will run async and return job info for retrieve generataion result later")
+    use_webp: bool = Field(default=True, description="output image use webp format")
 
 
 class ImgUpscaleOrVaryRequest(Text2ImgRequest):
