@@ -11,8 +11,8 @@ def predict_age(bytes_data) -> str:
         im = Image.open(BytesIO(bytes_data))
 
         # Init model, transforms
-        model = ViTForImageClassification.from_pretrained('./vit-age-classifier')
-        transforms = ViTImageProcessor.from_pretrained('./vit-age-classifier')
+        model = ViTForImageClassification.from_pretrained('nateraw/vit-age-classifier')
+        transforms = ViTImageProcessor.from_pretrained('nateraw/vit-age-classifier')
 
         # Transform our image and pass it through the model
         inputs = transforms(im, return_tensors='pt')
