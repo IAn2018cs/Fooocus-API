@@ -12,6 +12,8 @@ from modules import flags
 from modules import config
 from modules.sdxl_styles import legal_style_names
 
+from translate.prompt_translate import prompt_translate
+
 
 def req_to_params(req: Text2ImgRequest) -> ImageGenerationParams:
     if req.base_model_name is not None:
@@ -29,7 +31,7 @@ def req_to_params(req: Text2ImgRequest) -> ImageGenerationParams:
             print(f"[Warning] Wrong lora model_name input: {l.model_name}, using 'None'")
             l.model_name = 'None'
 
-    prompt = req.prompt
+    prompt = prompt_translate(req.prompt)
     negative_prompt = req.negative_prompt
     style_selections = [
         s for s in req.style_selections if s in legal_style_names]
