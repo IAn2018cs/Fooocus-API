@@ -7,7 +7,7 @@ from fastapi.params import File
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
-from fooocusapi.models import AllModelNamesResponse, AsyncJobResponse, QueryJobRequest,StopResponse , GeneratedImageResult, ImgInpaintOrOutpaintRequest, ImgPromptRequest, ImgUpscaleOrVaryRequest, JobQueueInfo, Text2ImgRequest
+from fooocusapi.models import AllModelNamesResponse, AsyncJobResponse, QueryJobRequest,StopResponse , GeneratedImageResult, ImgInpaintOrOutpaintRequest, ImgPromptRequest, ImgUpscaleOrVaryRequest, JobQueueInfo, Text2ImgRequest, AgeDetectorRequest, AgeDetectorResponse
 from fooocusapi.api_utils import generation_output, req_to_params
 from fooocusapi import file_utils
 from fooocusapi.parameters import GenerationFinishReason, ImageGenerationResult
@@ -15,6 +15,7 @@ from fooocusapi.task_queue import TaskType
 from fooocusapi.worker import process_generate, task_queue, process_top
 from fooocusapi.models_v2 import *
 from fooocusapi.img_utils import base64_to_stream
+from fooocusapi.age_detection import predict_age
 
 from concurrent.futures import ThreadPoolExecutor
 
@@ -272,6 +273,14 @@ def refresh_models():
 def all_styles():
     from modules.sdxl_styles import legal_style_names
     return legal_style_names
+
+
+@app.post("/v1/age-detector", response_model=AgeDetectorResponse, description="Get image age")
+def age_detector(req: AgeDetectorRequest):
+    import base64
+    image_bytes = base64.b64decode(req.base64)
+    age = predict_age(image_bytes)
+    return AgeDetectorResponse(age=age)
 
 
 app.mount("/files", StaticFiles(directory=file_utils.output_dir), name="files")
