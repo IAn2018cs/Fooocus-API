@@ -422,3 +422,11 @@ class AgeDetectorRequest(BaseModel):
 
 class AgeDetectorResponse(BaseModel):
     age: str = Field(description="Image age")
+
+
+class TranslatePromptRequest(BaseModel):
+    prompt: str = Field(description="prompt")
+
+
+class TranslatePromptResponse(BaseModel):
+    prompt: str = Field(description="translate prompt")

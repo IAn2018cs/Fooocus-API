@@ -16,6 +16,7 @@ from fooocusapi.worker import process_generate, task_queue, process_top
 from fooocusapi.models_v2 import *
 from fooocusapi.img_utils import base64_to_stream
 from fooocusapi.age_detection import predict_age
+from translate.prompt_translate import prompt_translate
 
 from concurrent.futures import ThreadPoolExecutor
 
@@ -281,6 +282,11 @@ def age_detector(req: AgeDetectorRequest):
     image_bytes = base64.b64decode(req.base64)
     age = predict_age(image_bytes)
     return AgeDetectorResponse(age=age)
+
+
+@app.post("/v1/prompt-translate", response_model=TranslatePromptResponse, description="prompt translate to en")
+def translate_prompt(req: TranslatePromptRequest):
+    return TranslatePromptResponse(prompt=prompt_translate(req.prompt))
 
 
 app.mount("/files", StaticFiles(directory=file_utils.output_dir), name="files")
