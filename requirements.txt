@@ -25,7 +25,6 @@ basicsr==1.4.2
 filetype==1.2.0
 realesrgan==0.3.0
 onnx==1.15.0
-onnxruntime==1.16.0
 
 fasttext-langdetect
 dl-translate
