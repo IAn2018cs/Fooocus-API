@@ -283,7 +283,7 @@ def prepare_environments(args) -> bool:
         sys.argv.append(args.preset)
 
     if args.enable_smart_memory:
-        sys.argv.append('--enable-smart-memory')
+        sys.argv.append('--disable-offload-from-vram')
 
     import modules.config as config
     import modules.flags as flags
