@@ -46,8 +46,9 @@ def process_generate(async_task: QueueTask, params: ImageGenerationParams) -> Li
     from modules.util import remove_empty_str, resize_image, HWC3, set_image_shape_ceil, get_image_shape_ceil, get_shape_ceil, resample_image
     from modules.private_logger import log
     from modules.upscaler import perform_upscale
-    from modules.expansion import safe_str
+    from extras.expansion import safe_str
     from modules.sdxl_styles import apply_style, fooocus_expansion, apply_wildcards
+    import fooocus_version
 
     outputs = TaskOutputs(async_task)
     results = []
@@ -516,7 +517,7 @@ def process_generate(async_task: QueueTask, params: ImageGenerationParams) -> Li
 
             if direct_return:
                 d = [('Upscale (Fast)', '2x')]
-                log(uov_input_image, d, single_line_number=1)
+                log(uov_input_image, d)
                 return yield_result(async_task, uov_input_image, tasks)
 
             tiled = True
@@ -546,7 +547,7 @@ def process_generate(async_task: QueueTask, params: ImageGenerationParams) -> Li
         if 'inpaint' in goals:
             if len(outpaint_selections) > 0:
                 H, W, C = inpaint_image.shape
-                if 'top' in outpaint_selections:
+                if 'top' in outpaint_selections and outpaint_distance_top != 0:
                     distance_top = int(H * 0.3)
                     if outpaint_distance_top > 0:
                         distance_top = outpaint_distance_top
@@ -554,7 +555,7 @@ def process_generate(async_task: QueueTask, params: ImageGenerationParams) -> Li
                     inpaint_image = np.pad(inpaint_image, [[distance_top, 0], [0, 0], [0, 0]], mode='edge')
                     inpaint_mask = np.pad(inpaint_mask, [[distance_top, 0], [0, 0]], mode='constant',
                                           constant_values=255)
-                if 'bottom' in outpaint_selections:
+                if 'bottom' in outpaint_selections and outpaint_distance_bottom != 0:
                     distance_bottom = int(H * 0.3)
                     if outpaint_distance_bottom > 0:
                         distance_bottom = outpaint_distance_bottom
@@ -564,7 +565,7 @@ def process_generate(async_task: QueueTask, params: ImageGenerationParams) -> Li
                                           constant_values=255)
 
                 H, W, C = inpaint_image.shape
-                if 'left' in outpaint_selections:
+                if 'left' in outpaint_selections and outpaint_distance_left != 0:
                     distance_left = int(W * 0.3)
                     if outpaint_distance_left > 0:
                         distance_left = outpaint_distance_left
@@ -572,7 +573,7 @@ def process_generate(async_task: QueueTask, params: ImageGenerationParams) -> Li
                     inpaint_image = np.pad(inpaint_image, [[0, 0], [distance_left, 0], [0, 0]], mode='edge')
                     inpaint_mask = np.pad(inpaint_mask, [[0, 0], [distance_left, 0]], mode='constant',
                                           constant_values=255)
-                if 'right' in outpaint_selections:
+                if 'right' in outpaint_selections and outpaint_distance_right != 0:
                     distance_right = int(W * 0.3)
                     if outpaint_distance_right > 0:
                         distance_right = outpaint_distance_right
@@ -808,12 +809,13 @@ def process_generate(async_task: QueueTask, params: ImageGenerationParams) -> Li
                         ('Refiner Switch', refiner_switch),
                         ('Sampler', sampler_name),
                         ('Scheduler', scheduler_name),
-                        ('Seed', task['task_seed'])
+                        ('Seed', task['task_seed']),
                     ]
                     for n, w in loras:
                         if n != 'None':
-                            d.append((f'LoRA [{n}] weight', w))
-                    log(x, d, single_line_number=3)
+                            d.append((f'LoRA', f'{n} : {w}'))
+                    d.append(('Version', 'v' + fooocus_version.version))
+                    log(x, d)
                 
                 # Fooocus async_worker.py code end
                 
