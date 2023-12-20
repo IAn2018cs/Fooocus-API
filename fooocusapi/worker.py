@@ -78,7 +78,7 @@ def process_generate(async_task: QueueTask, params: ImageGenerationParams) -> Li
                 break
         if source_file:
             new_img_filename = create_output_file_name(use_webp=async_task.req_param['use_webp'])
-            new_img = run(source_file, output_file_to_file_path(img_filename), output_file_to_file_path(new_img_filename))
+            new_img = run([source_file], output_file_to_file_path(img_filename), output_file_to_file_path(new_img_filename), provider='cuda')
             if new_img:
                 return new_img_filename
         return img_filename
