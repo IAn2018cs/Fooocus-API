@@ -11,7 +11,7 @@ from fooocusapi.task_queue import QueueTask, TaskQueue, TaskOutputs
 from facefusion.core import run
 
 
-task_queue = TaskQueue(queue_size=3, hisotry_size=6)
+task_queue = TaskQueue(queue_size=3, hisotry_size=6, webhook_url=None)
 
 
 def process_top():
@@ -27,9 +27,9 @@ def process_generate(async_task: QueueTask, params: ImageGenerationParams) -> Li
     except Exception as e:
         print('Import default pipeline error:', e)
         if not async_task.is_finished:
-            task_queue.finish_task(async_task.seq)
+            task_queue.finish_task(async_task.job_id)
             async_task.set_result([], True, str(e))
-            print(f"[Task Queue] Finish task with error, seq={async_task.seq}")
+            print(f"[Task Queue] Finish task with error, seq={async_task.job_id}")
         return []
 
     import modules.patch as patch
@@ -93,8 +93,8 @@ def process_generate(async_task: QueueTask, params: ImageGenerationParams) -> Li
             img_filename = save_output_file(im, use_webp=async_task.req_param['use_webp'])
             results.append(ImageGenerationResult(im=swap_face(img_filename), seed=str(seed), finish_reason=GenerationFinishReason.success))
         async_task.set_result(results, False)
-        task_queue.finish_task(async_task.seq)
-        print(f"[Task Queue] Finish task, seq={async_task.seq}")
+        task_queue.finish_task(async_task.job_id)
+        print(f"[Task Queue] Finish task, job_id={async_task.job_id}")
 
         outputs.append(['results', imgs])
         pipeline.prepare_text_encoder(async_call=True)
@@ -103,21 +103,21 @@ def process_generate(async_task: QueueTask, params: ImageGenerationParams) -> Li
     try:
         waiting_sleep_steps: int = 0
         waiting_start_time = time.perf_counter()
-        while not task_queue.is_task_ready_to_start(async_task.seq):
+        while not task_queue.is_task_ready_to_start(async_task.job_id):
             if waiting_sleep_steps == 0:
                 print(
-                    f"[Task Queue] Waiting for task queue become free, seq={async_task.seq}")
+                    f"[Task Queue] Waiting for task queue become free, job_id={async_task.job_id}")
             delay = 0.1
             time.sleep(delay)
             waiting_sleep_steps += 1
             if waiting_sleep_steps % int(10 / delay) == 0:
                 waiting_time = time.perf_counter() - waiting_start_time
                 print(
-                    f"[Task Queue] Already waiting for {waiting_time}S, seq={async_task.seq}")
+                    f"[Task Queue] Already waiting for {waiting_time}S, seq={async_task.job_id}")
 
-        print(f"[Task Queue] Task queue is free, start task, seq={async_task.seq}")
+        print(f"[Task Queue] Task queue is free, start task, job_id={async_task.job_id}")
 
-        task_queue.start_task(async_task.seq)
+        task_queue.start_task(async_task.job_id)
 
         execution_start_time = time.perf_counter()
 
@@ -238,7 +238,7 @@ def process_generate(async_task: QueueTask, params: ImageGenerationParams) -> Li
         denoising_strength = 1.0
         tiled = False
 
-        width, height = aspect_ratios_selection.replace('×', ' ').split(' ')[:2]
+        width, height = aspect_ratios_selection.replace('*', '*').replace('*', ' ').split(' ')[:2]
         width, height = int(width), int(height)
 
         skip_prompt_processing = False
@@ -547,7 +547,7 @@ def process_generate(async_task: QueueTask, params: ImageGenerationParams) -> Li
         if 'inpaint' in goals:
             if len(outpaint_selections) > 0:
                 H, W, C = inpaint_image.shape
-                if 'top' in outpaint_selections and outpaint_distance_top != 0:
+                if 'top' in outpaint_selections:
                     distance_top = int(H * 0.3)
                     if outpaint_distance_top > 0:
                         distance_top = outpaint_distance_top
@@ -555,7 +555,8 @@ def process_generate(async_task: QueueTask, params: ImageGenerationParams) -> Li
                     inpaint_image = np.pad(inpaint_image, [[distance_top, 0], [0, 0], [0, 0]], mode='edge')
                     inpaint_mask = np.pad(inpaint_mask, [[distance_top, 0], [0, 0]], mode='constant',
                                           constant_values=255)
-                if 'bottom' in outpaint_selections and outpaint_distance_bottom != 0:
+                
+                if 'bottom' in outpaint_selections:
                     distance_bottom = int(H * 0.3)
                     if outpaint_distance_bottom > 0:
                         distance_bottom = outpaint_distance_bottom
@@ -565,7 +566,7 @@ def process_generate(async_task: QueueTask, params: ImageGenerationParams) -> Li
                                           constant_values=255)
 
                 H, W, C = inpaint_image.shape
-                if 'left' in outpaint_selections and outpaint_distance_left != 0:
+                if 'left' in outpaint_selections:
                     distance_left = int(W * 0.3)
                     if outpaint_distance_left > 0:
                         distance_left = outpaint_distance_left
@@ -573,7 +574,8 @@ def process_generate(async_task: QueueTask, params: ImageGenerationParams) -> Li
                     inpaint_image = np.pad(inpaint_image, [[0, 0], [distance_left, 0], [0, 0]], mode='edge')
                     inpaint_mask = np.pad(inpaint_mask, [[0, 0], [distance_left, 0]], mode='constant',
                                           constant_values=255)
-                if 'right' in outpaint_selections and outpaint_distance_right != 0:
+                
+                if 'right' in outpaint_selections:
                     distance_right = int(W * 0.3)
                     if outpaint_distance_right > 0:
                         distance_right = outpaint_distance_right
@@ -581,7 +583,7 @@ def process_generate(async_task: QueueTask, params: ImageGenerationParams) -> Li
                     inpaint_image = np.pad(inpaint_image, [[0, 0], [0, distance_right], [0, 0]], mode='edge')
                     inpaint_mask = np.pad(inpaint_mask, [[0, 0], [0, distance_right]], mode='constant',
                                           constant_values=255)
-
+                    
                 inpaint_image = np.ascontiguousarray(inpaint_image.copy())
                 inpaint_mask = np.ascontiguousarray(inpaint_mask.copy())
                 advanced_parameters.inpaint_strength = 1.0
@@ -837,13 +839,13 @@ def process_generate(async_task: QueueTask, params: ImageGenerationParams) -> Li
             print(f'Generating and saving time: {execution_time:.2f} seconds')
 
         if async_task.finish_with_error:
-            task_queue.finish_task(async_task.seq)
+            task_queue.finish_task(async_task.job_id)
             return async_task.task_result
         return yield_result(None, results, tasks)
     except Exception as e:
         print('Worker error:', e)
         if not async_task.is_finished:
-            task_queue.finish_task(async_task.seq)
+            task_queue.finish_task(async_task.job_id)
             async_task.set_result([], True, str(e))
-            print(f"[Task Queue] Finish task with error, seq={async_task.seq}")
+            print(f"[Task Queue] Finish task with error, job_id={async_task.job_id}")
         return []

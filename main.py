@@ -263,7 +263,8 @@ def prepare_environments(args) -> bool:
     import fooocusapi.worker as worker
     worker.task_queue.queue_size = args.queue_size
     worker.task_queue.history_size = args.queue_history
-    print(f"[Fooocus-API] Task queue size: {args.queue_size}, queue history size: {args.queue_history}")
+    worker.task_queue.webhook_url = args.webhook_url
+    print(f"[Fooocus-API] Task queue size: {args.queue_size}, queue history size: {args.queue_history}, webhook url: {args.webhook_url}")
 
     if args.gpu_device_id is not None:
         os.environ['CUDA_VISIBLE_DEVICES'] = str(args.gpu_device_id)
@@ -284,9 +285,6 @@ def prepare_environments(args) -> bool:
         if os.path.exists(preset_folder):
             shutil.rmtree(preset_folder)
         shutil.copytree(origin_preset_folder, preset_folder)
-
-        sys.argv.append('--preset')
-        sys.argv.append(args.preset)
 
     if args.enable_smart_memory:
         sys.argv.append('--disable-offload-from-vram')
@@ -313,29 +311,44 @@ def prepare_environments(args) -> bool:
 
     return True
 
-def pre_setup(skip_sync_repo: bool=False, disable_image_log: bool=False, skip_pip=False, load_all_models: bool=False, preload_pipeline: bool=False, preset: str | None=None, enable_smart_memory: bool=False):
+def pre_setup(skip_sync_repo: bool=False, disable_private_log: bool=False, skip_pip=False, load_all_models: bool=False, preload_pipeline: bool=False, always_gpu: bool=False, all_in_fp16: bool=False, preset: str | None=None, enable_smart_memory: bool=False):
     class Args(object):
         host = '127.0.0.1'
         port = 8888
         base_url = None
         sync_repo = None
-        disable_image_log = False
+        disable_private_log = False
         skip_pip = False
         preload_pipeline = False
         queue_size = 3
         queue_history = 100
         preset = None
+        always_gpu = False
+        all_in_fp16 = False
+        gpu_device_id = None
         enable_smart_memory = False
 
     print("[Pre Setup] Prepare environments")
 
     args = Args()
-    args.disable_image_log = disable_image_log
-    args.preload_pipeline = preload_pipeline
-    args.preset = preset
-    args.enable_smart_memory = enable_smart_memory
     if skip_sync_repo:
         args.sync_repo = 'skip'
+    args.disable_private_log = disable_private_log
+    args.skip_pip = skip_pip
+    args.preload_pipeline = preload_pipeline
+    args.always_gpu = always_gpu
+    args.all_in_fp16 = all_in_fp16
+    args.preset = preset
+    args.enable_smart_memory = enable_smart_memory
+
+    sys.argv = [sys.argv[0]]
+    if args.preset is not None:
+        sys.argv.append('--preset')
+        sys.argv.append(args.preset)
+
+    install_dependents(args)
+
+    import fooocusapi.args as _
     prepare_environments(args)
 
     if load_all_models:
