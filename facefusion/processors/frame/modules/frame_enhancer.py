@@ -9,7 +9,7 @@ import facefusion.globals
 from facefusion import logger, wording
 from facefusion.face_analyser import clear_face_analyser
 from facefusion.typing import Face, FaceSet, Frame, Update_Process, ProcessMode, ModelSet, OptionsWithModel
-from facefusion.cli_helper import create_metavar
+from facefusion.common_helper import create_metavar
 from facefusion.execution_helper import map_device
 from facefusion.filesystem import is_file, resolve_relative_path
 from facefusion.download import conditional_download, is_download_done
@@ -162,7 +162,8 @@ def process_frames(source_paths : List[str], temp_frame_paths : List[str], updat
 		update_progress()
 
 
-def process_image(source_paths : List[str], target_path : str, output_path : str) -> None:
+def process_image(source_paths : List[str], target_path : str, output_path : str) -> bool:
 	target_frame = read_static_image(target_path)
 	result = process_frame(None, None, target_frame)
 	write_image(output_path, result)
+	return True

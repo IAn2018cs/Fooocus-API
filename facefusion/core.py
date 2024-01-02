@@ -145,18 +145,17 @@ def conditional_append_reference_faces() -> None:
 def process_image() -> None:
     shutil.copy2(facefusion.globals.target_path, facefusion.globals.output_path)
     # process frame
+    need_post_models = facefusion.globals.current_device != facefusion.globals.last_device
+    facefusion.globals.last_device = facefusion.globals.current_device
     for frame_processor_module in get_frame_processors_modules(facefusion.globals.frame_processors):
         logger.info(wording.get('processing'), frame_processor_module.NAME)
-        logger.info(
-            f'current device: {facefusion.globals.current_device}, last device: {facefusion.globals.last_device}',
-            frame_processor_module.NAME)
-        if facefusion.globals.current_device != facefusion.globals.last_device:
+        if need_post_models:
             logger.info('device changed, post models', frame_processor_module.NAME)
             frame_processor_module.post_models()
-        facefusion.globals.last_device = facefusion.globals.current_device
-        frame_processor_module.process_image(facefusion.globals.source_paths, facefusion.globals.output_path,
-                                             facefusion.globals.output_path)
+        processor_success = frame_processor_module.process_image(facefusion.globals.source_paths, facefusion.globals.output_path, facefusion.globals.output_path)
         frame_processor_module.post_process()
+        if not processor_success:
+            return
     # validate image
     if is_image(facefusion.globals.output_path):
         logger.info(wording.get('processing_image_succeed'), __name__.upper())

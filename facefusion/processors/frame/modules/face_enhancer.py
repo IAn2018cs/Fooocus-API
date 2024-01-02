@@ -11,7 +11,7 @@ from facefusion.face_analyser import get_many_faces, clear_face_analyser, find_s
 from facefusion.face_helper import warp_face, paste_back
 from facefusion.face_store import get_reference_faces
 from facefusion.typing import Face, FaceSet, Frame, Update_Process, ProcessMode, ModelSet, OptionsWithModel
-from facefusion.cli_helper import create_metavar
+from facefusion.common_helper import create_metavar
 from facefusion.filesystem import is_file, is_image, is_video, resolve_relative_path
 from facefusion.download import conditional_download, is_download_done
 from facefusion.vision import read_image, read_static_image, write_image
@@ -211,21 +211,30 @@ def get_reference_frame(source_face : Face, target_face : Face, temp_frame : Fra
 	return enhance_face(target_face, temp_frame)
 
 
-def process_frame(source_face : Face, reference_faces : FaceSet, temp_frame : Frame) -> Frame:
+def process_frame(source_face : Face, reference_faces : FaceSet, temp_frame : Frame) -> Optional[Frame]:
 	if 'reference' in facefusion.globals.face_selector_mode:
 		similar_faces = find_similar_faces(temp_frame, reference_faces, facefusion.globals.reference_face_distance)
 		if similar_faces:
 			for similar_face in similar_faces:
 				temp_frame = enhance_face(similar_face, temp_frame)
+		else:
+			logger.error("No target face detected" + wording.get('exclamation_mark'), NAME)
+			return None
 	if 'one' in facefusion.globals.face_selector_mode:
 		target_face = get_one_face(temp_frame)
 		if target_face:
 			temp_frame = enhance_face(target_face, temp_frame)
+		else:
+			logger.error("No target face detected" + wording.get('exclamation_mark'), NAME)
+			return None
 	if 'many' in facefusion.globals.face_selector_mode:
 		many_faces = get_many_faces(temp_frame)
 		if many_faces:
 			for target_face in many_faces:
 				temp_frame = enhance_face(target_face, temp_frame)
+		else:
+			logger.error("No target face detected" + wording.get('exclamation_mark'), NAME)
+			return None
 	return temp_frame
 
 
@@ -238,8 +247,11 @@ def process_frames(source_path : List[str], temp_frame_paths : List[str], update
 		update_progress()
 
 
-def process_image(source_path : str, target_path : str, output_path : str) -> None:
+def process_image(source_path : str, target_path : str, output_path : str) -> bool:
 	reference_faces = get_reference_faces() if 'reference' in facefusion.globals.face_selector_mode else None
 	target_frame = read_static_image(target_path)
 	result_frame = process_frame(None, reference_faces, target_frame)
+	if result_frame is None:
+		return False
 	write_image(output_path, result_frame)
+	return True
