@@ -144,7 +144,7 @@ def text_to_img_with_ip(req: Text2ImgRequestWithPrompt,
     req.image_prompts = image_prompts_files
 
     results = call_worker(req, accept)
-    return generation_output(results, streaming_output, req.require_base64)
+    return generation_output(results, streaming_output, req.require_base64, req.use_webp)
 
 @app.post("/v1/generation/image-upscale-vary", response_model=List[GeneratedImageResult] | AsyncJobResponse, responses=img_generate_responses)
 def img_upscale_or_vary(input_image: UploadFile, req: ImgUpscaleOrVaryRequest = Depends(ImgUpscaleOrVaryRequest.as_form),
