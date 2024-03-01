@@ -1,13 +1,13 @@
 # Prediction interface for Cog ⚙️
 # https://github.com/replicate/cog/blob/main/docs/python.md
 
+import copy
 import os
 import numpy as np
 
 from PIL import Image
 from typing import List
-from cog import BasePredictor, Input, Path
-from fooocusapi.worker import process_generate, task_queue
+from cog import BasePredictor, BaseModel, Input, Path
 from fooocusapi.file_utils import output_dir
 from fooocusapi.parameters import (GenerationFinishReason,
                                    ImageGenerationParams,
@@ -23,12 +23,15 @@ from fooocusapi.parameters import (GenerationFinishReason,
                                    default_prompt_negative)
 from fooocusapi.task_queue import TaskType
 
+class Output(BaseModel):
+    seeds: List[str]
+    paths: List[Path]
 
 class Predictor(BasePredictor):
     def setup(self) -> None:
         """Load the model into memory to make running multiple predictions efficient"""
         from main import pre_setup
-        pre_setup(disable_private_log=True, skip_pip=True, preload_pipeline=True, preset=None)
+        pre_setup(disable_image_log=True, skip_pip=True, preload_pipeline=True, preset=None)
 
     def predict(
         self,
@@ -98,14 +101,15 @@ class Predictor(BasePredictor):
         cn_weight4: float = Input(default=None, ge=0, le=2, 
                                 description="Weight for image prompt, None for default value"),
         cn_type4: str = Input(default='ImagePrompt', description="ControlNet type for image prompt", choices=['ImagePrompt', 'FaceSwap', 'PyraCanny', 'CPDS']),
-    ) -> List[Path]:
+    ) -> Output:
         """Run a single prediction on the model"""
         import modules.flags as flags
         from modules.sdxl_styles import legal_style_names
+        from fooocusapi.worker import blocking_get_task_result, worker_queue
 
         base_model_name = default_base_model_name
         refiner_model_name = default_refiner_model_name
-        loras = default_loras
+        loras = copy.copy(default_loras)
 
         style_selections_arr = []
         for s in style_selections.strip().split(','):
@@ -177,22 +181,25 @@ class Predictor(BasePredictor):
                                         outpaint_distance_left=outpaint_distance_left,
                                         outpaint_distance_top=outpaint_distance_top,
                                         outpaint_distance_right=outpaint_distance_right,
-                                        outpaint_distance_bottom=outpaint_distance_bottom
+                                        outpaint_distance_bottom=outpaint_distance_bottom,
+                                        require_base64=False,
                                        )
 
         print(f"[Predictor Predict] Params: {params.__dict__}")
 
-        queue_task = task_queue.add_task(TaskType.text_2_img, {'params': params.__dict__, 'require_base64': False})
-        if queue_task is None:
+        async_task = worker_queue.add_task(TaskType.text_2_img, {'params': params.__dict__, 'require_base64': False})
+        if async_task is None:
             print("[Task Queue] The task queue has reached limit")
             raise Exception(
                 f"The task queue has reached limit."
             )
-        results = process_generate(queue_task, params)
+        results = blocking_get_task_result(async_task.job_id)
 
         output_paths: List[Path] = []
+        output_seeds: List[str] = []
         for r in results:
             if r.finish_reason == GenerationFinishReason.success and r.im is not None:
+                output_seeds.append(r.seed)
                 output_paths.append(Path(os.path.join(output_dir, r.im)))
 
         print(f"[Predictor Predict] Finished with {len(output_paths)} images")
@@ -202,4 +209,4 @@ class Predictor(BasePredictor):
                 f"Process failed."
             )
 
-        return output_paths
+        return Output(seeds=output_seeds, paths=output_paths)

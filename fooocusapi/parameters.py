@@ -11,8 +11,6 @@ default_base_model_name = 'juggernautXL_version6Rundiffusion.safetensors'
 default_refiner_model_name = 'None'
 default_refiner_switch = 0.5
 default_loras = [['sd_xl_offset_example-lora_1.0.safetensors', 0.1]]
-default_lora_name = 'sd_xl_offset_example-lora_1.0.safetensors'
-default_lora_weight = 0.1
 default_cfg_scale = 4.0
 default_prompt_negative = ''
 default_aspect_ratio = '1152*896'
@@ -102,7 +100,8 @@ class ImageGenerationParams(object):
                  inpaint_input_image: Dict[str, np.ndarray] | None,
                  inpaint_additional_prompt: str | None,
                  image_prompts: List[Tuple[np.ndarray, float, float, str]],
-                 advanced_params: List[any] | None):
+                 advanced_params: List[any] | None,
+                 require_base64: bool):
         self.prompt = prompt
         self.negative_prompt = negative_prompt
         self.style_selections = style_selections
@@ -127,6 +126,7 @@ class ImageGenerationParams(object):
         self.inpaint_input_image = inpaint_input_image
         self.inpaint_additional_prompt = inpaint_additional_prompt
         self.image_prompts = image_prompts
+        self.require_base64 = require_base64
         
         if advanced_params is None:
             disable_preview = False
@@ -165,7 +165,11 @@ class ImageGenerationParams(object):
 
             # Auto set mixing_image_prompt_and_inpaint to True
             if len(self.image_prompts) > 0 and inpaint_input_image is not None:
+                print('Mixing Image Prompts and Inpaint Enabled')
                 mixing_image_prompt_and_inpaint = True
+            if len(self.image_prompts) > 0 and uov_input_image is not None:
+                print('Mixing Image Prompts and Vary Upscale Enabled')
+                mixing_image_prompt_and_vary_upscale = True
 
             self.advanced_params = [
                 disable_preview, adm_scaler_positive, adm_scaler_negative, adm_scaler_end, adaptive_cfg, sampler_name, \

@@ -1,6 +1,10 @@
 from typing import List
 
 from fastapi import Response
+from fastapi.security import APIKeyHeader
+from fastapi import HTTPException, Security
+
+from fooocusapi.args import args
 from fooocusapi.file_utils import get_file_serve_url, output_file_to_base64img, output_file_to_bytesimg
 from fooocusapi.img_utils import read_input_image
 from fooocusapi.models import AsyncJobResponse, AsyncJobStage, GeneratedImageResult, GenerationFinishReason, ImgInpaintOrOutpaintRequest, ImgPromptRequest, ImgUpscaleOrVaryRequest, Text2ImgRequest
@@ -14,6 +18,13 @@ from modules.sdxl_styles import legal_style_names
 
 from translate.prompt_translate import prompt_translate
 
+api_key_header = APIKeyHeader(name="X-API-KEY", auto_error=False)
+
+def api_key_auth(apikey: str = Security(api_key_header)):
+    if args.apikey is None:
+        return  # Skip API key check if no API key is set
+    if apikey != args.apikey:
+        raise HTTPException(status_code=403, detail="Forbidden")
 
 def req_to_params(req: Text2ImgRequest) -> ImageGenerationParams:
     if req.base_model_name is not None:
@@ -82,9 +93,13 @@ def req_to_params(req: Text2ImgRequest) -> ImageGenerationParams:
         }
 
     image_prompts = []
-    if isinstance(req, ImgPromptRequest) or isinstance(req, ImgPromptRequestJson) or isinstance(req, Text2ImgRequestWithPrompt):
+    if isinstance(req, ImgPromptRequest) or isinstance(req, ImgPromptRequestJson) or isinstance(req, Text2ImgRequestWithPrompt) or isinstance(req, ImgUpscaleOrVaryRequestJson) or isinstance(req, ImgInpaintOrOutpaintRequestJson):
         # Auto set mixing_image_prompt_and_inpaint to True
-        if len(req.image_prompts) > 0 and not isinstance(req, Text2ImgRequestWithPrompt) and req.input_image is not None and req.advanced_params is not None:
+        if len(req.image_prompts) > 0 and uov_input_image is not None:
+            print("[INFO] Mixing image prompt and vary upscale is set to True")
+            req.advanced_params.mixing_image_prompt_and_vary_upscale = True
+        elif len(req.image_prompts) > 0 and not isinstance(req, Text2ImgRequestWithPrompt) and req.input_image is not None:
+            print("[INFO] Mixing image prompt and inpaint is set to True")
             req.advanced_params.mixing_image_prompt_and_inpaint = True
 
         for img_prompt in req.image_prompts:
@@ -154,61 +169,54 @@ def req_to_params(req: Text2ImgRequest) -> ImageGenerationParams:
                                  inpaint_additional_prompt=inpaint_additional_prompt,
                                  image_prompts=image_prompts,
                                  advanced_params=advanced_params,
+                                 require_base64=req.require_base64,
                                  )
 
 
-def generation_output(results: QueueTask | List[ImageGenerationResult], streaming_output: bool, require_base64: bool, use_webp: bool, require_step_preivew: bool=False) -> Response | List[GeneratedImageResult] | AsyncJobResponse:
-    if isinstance(results, QueueTask):
-        task = results
-        job_stage = AsyncJobStage.running
-        job_result = None
-        if task.start_millis == 0:
-            job_stage = AsyncJobStage.waiting
-        if task.is_finished:
-            if task.finish_with_error:
-                job_stage = AsyncJobStage.error
-            else:
-                if task.task_result != None:
-                    job_stage = AsyncJobStage.success
-                    task_result_require_base64 = False
-                    if 'require_base64' in task.req_param and task.req_param['require_base64']:
-                        task_result_require_base64 = True
+def generate_async_output(task: QueueTask, require_step_preview: bool = False) -> AsyncJobResponse:
+    job_stage = AsyncJobStage.running
+    job_result = None
 
-                    job_result = generation_output(task.task_result, False, task_result_require_base64, use_webp)
-        job_step_preview = None if not require_step_preivew else task.task_step_preview
-        return AsyncJobResponse(job_id=task.job_id,
-                                job_type=task.type,
-                                job_stage=job_stage,
-                                job_progress=task.finish_progress,
-                                job_status=task.task_status,
-                                job_step_preview=job_step_preview,
-                                job_result=job_result)
+    if task.start_millis == 0:
+        job_stage = AsyncJobStage.waiting
 
-    if streaming_output:
-        if len(results) == 0:
-            return Response(status_code=500)
-        result = results[0]
-        if result.finish_reason == GenerationFinishReason.queue_is_full:
-            return Response(status_code=409, content=result.finish_reason.value)
-        elif result.finish_reason == GenerationFinishReason.user_cancel:
-            return Response(status_code=400, content=result.finish_reason.value)
-        elif result.finish_reason == GenerationFinishReason.error:
-            return Response(status_code=500, content=result.finish_reason.value)
-        
-        bytes = output_file_to_bytesimg(results[0].im, use_webp=use_webp)
-        if use_webp:
-            media_type = 'image/webp'
-        else:
-            media_type = 'image/png'
-        return Response(bytes, media_type=media_type)
-    else:
-        results = [GeneratedImageResult(
-            base64=output_file_to_base64img(
-                item.im, use_webp=use_webp) if require_base64 else None,
+    if task.is_finished:
+        if task.finish_with_error:
+            job_stage = AsyncJobStage.error
+        elif task.task_result != None:
+            job_stage = AsyncJobStage.success
+            job_result = generate_image_result_output(task.task_result, task.req_param.require_base64)
+    return AsyncJobResponse(job_id=task.job_id,
+                            job_type=task.type,
+                            job_stage=job_stage,
+                            job_progress=task.finish_progress,
+                            job_status=task.task_status,
+                            job_step_preview= task.task_step_preview if require_step_preview else None,
+                            job_result=job_result)
+
+
+def generate_streaming_output(results: List[ImageGenerationResult]) -> Response:
+    if len(results) == 0:
+        return Response(status_code=500)
+    result = results[0]
+    if result.finish_reason == GenerationFinishReason.queue_is_full:
+        return Response(status_code=409, content=result.finish_reason.value)
+    elif result.finish_reason == GenerationFinishReason.user_cancel:
+        return Response(status_code=400, content=result.finish_reason.value)
+    elif result.finish_reason == GenerationFinishReason.error:
+        return Response(status_code=500, content=result.finish_reason.value)
+
+    bytes = output_file_to_bytesimg(results[0].im)
+    return Response(bytes, media_type='image/png')
+
+
+def generate_image_result_output(results: List[ImageGenerationResult], require_base64: bool) -> List[GeneratedImageResult]:
+    results = [GeneratedImageResult(
+            base64=output_file_to_base64img(item.im) if require_base64 else None,
             url=get_file_serve_url(item.im),
             seed=item.seed,
             finish_reason=item.finish_reason) for item in results]
-        return results
+    return results
 
 
 class QueueReachLimitException(Exception):

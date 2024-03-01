@@ -125,10 +125,8 @@ class Text2ImgRequest(BaseModel):
     advanced_params: AdvancedParams | None = AdvancedParams()
     require_base64: bool = Field(default=False, description="Return base64 data of generated image")
     async_process: bool = Field(default=False, description="Set to true will run async and return job info for retrieve generataion result later")
-    webhook_url: str | None = Field(default=None, description="Optional URL for a webhook callback. If provided, the system will send a POST request to this URL upon task completion or failure."
-                                            " This allows for asynchronous notification of task status.")
-    use_webp: bool = Field(default=True, description="output image use webp format")
-
+    webhook_url: str | None = Field(default='', description="Optional URL for a webhook callback. If provided, the system will send a POST request to this URL upon task completion or failure."
+                                                              " This allows for asynchronous notification of task status.")
 
 def style_selection_parser(style_selections: str) -> List[str]:
     style_selection_arr: List[str] = []
@@ -407,7 +405,7 @@ class AsyncJobStage(str, Enum):
 
 class QueryJobRequest(BaseModel):
     job_id: str = Field(description="Job ID to query")
-    require_step_preivew: bool = Field(False, description="Set to true will return preview image of generation steps at current time")
+    require_step_preview: bool = Field(False, description="Set to true will return preview image of generation steps at current time")
 
 
 class AsyncJobResponse(BaseModel):
@@ -423,7 +421,7 @@ class AsyncJobResponse(BaseModel):
 class JobQueueInfo(BaseModel):
     running_size: int = Field(description="The current running and waiting job count")
     finished_size: int = Field(description="Finished job cound (after auto clean)")
-    last_job_id: str = Field(description="Last submit generation job id")
+    last_job_id: str | None = Field(description="Last submit generation job id")
 
 
 # TODO May need more detail fields, will add later when someone need
@@ -446,7 +444,7 @@ class AllModelNamesResponse(BaseModel):
         protected_namespaces=('protect_me_', 'also_protect_')
     )
 
-
+    
 class StopResponse(BaseModel):
     msg: str
 
