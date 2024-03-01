@@ -447,19 +447,3 @@ class AllModelNamesResponse(BaseModel):
     
 class StopResponse(BaseModel):
     msg: str
-
-
-class AgeDetectorRequest(BaseModel):
-    base64: str = Field(description="Image encoded in base64")
-
-
-class AgeDetectorResponse(BaseModel):
-    age: str = Field(description="Image age")
-
-
-class TranslatePromptRequest(BaseModel):
-    prompt: str = Field(description="prompt")
-
-
-class TranslatePromptResponse(BaseModel):
-    prompt: str = Field(description="translate prompt")

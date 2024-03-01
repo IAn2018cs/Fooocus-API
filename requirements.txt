@@ -21,6 +21,3 @@ python-multipart==0.0.6
 uvicorn[standard]==0.23.2
 
 facefusionlib[gpu]==1.0.8
-
-fasttext-langdetect
-dl-translate

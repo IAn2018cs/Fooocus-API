@@ -15,8 +15,6 @@ from fooocusapi.task_queue import TaskType
 from fooocusapi.worker import worker_queue, process_top, blocking_get_task_result
 from fooocusapi.models_v2 import *
 from fooocusapi.img_utils import base64_to_stream, read_input_image
-from fooocusapi.age_detection import predict_age
-from translate.prompt_translate import prompt_translate
 
 from modules.util import HWC3
 
@@ -343,19 +341,6 @@ def refresh_models():
 def all_styles():
     from modules.sdxl_styles import legal_style_names
     return legal_style_names
-
-
-@secure_router.post("/v1/age-detector", response_model=AgeDetectorResponse, description="Get image age")
-def age_detector(req: AgeDetectorRequest):
-    import base64
-    image_bytes = base64.b64decode(req.base64)
-    age = predict_age(image_bytes)
-    return AgeDetectorResponse(age=age)
-
-
-@secure_router.post("/v1/prompt-translate", response_model=TranslatePromptResponse, description="prompt translate to en")
-def translate_prompt(req: TranslatePromptRequest):
-    return TranslatePromptResponse(prompt=prompt_translate(req.prompt))
 
 
 app.mount("/files", StaticFiles(directory=file_utils.output_dir), name="files")

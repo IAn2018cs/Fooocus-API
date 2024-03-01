@@ -16,8 +16,6 @@ from modules import flags
 from modules import config
 from modules.sdxl_styles import legal_style_names
 
-from translate.prompt_translate import prompt_translate
-
 api_key_header = APIKeyHeader(name="X-API-KEY", auto_error=False)
 
 def api_key_auth(apikey: str = Security(api_key_header)):
@@ -42,7 +40,7 @@ def req_to_params(req: Text2ImgRequest) -> ImageGenerationParams:
             print(f"[Warning] Wrong lora model_name input: {l.model_name}, using 'None'")
             l.model_name = 'None'
 
-    prompt = prompt_translate(req.prompt)
+    prompt = req.prompt
     negative_prompt = req.negative_prompt
     style_selections = [
         s for s in req.style_selections if s in legal_style_names]
