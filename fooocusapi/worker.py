@@ -5,12 +5,15 @@ import numpy as np
 import torch
 import re
 import logging
+import os
 
 from typing import List
-from fooocusapi.file_utils import save_output_file, output_file_to_file_path, create_output_file_name
+from fooocusapi.file_utils import save_output_file
 from fooocusapi.parameters import GenerationFinishReason, ImageGenerationResult
 from fooocusapi.task_queue import QueueTask, TaskQueue, TaskOutputs
-from facefusion.core import run
+from fooocusapi.file_utils import output_file_to_file_path, create_output_file_name
+from facefusionlib import swapper
+from facefusionlib.swapper import DeviceProvider
 
 worker_queue: TaskQueue = None
 
@@ -106,12 +109,26 @@ def process_generate(async_task: QueueTask):
         for img_prompt in params.image_prompts:
             cn_img, cn_stop, cn_weight, cn_type = img_prompt
             if flags.cn_ip_face == cn_type:
-                source_file = output_file_to_file_path(save_output_file(cn_img, use_webp=async_task.req_param['use_webp']))
+                source_file = output_file_to_file_path(save_output_file(cn_img))
                 break
         if source_file:
-            new_img_filename = create_output_file_name(use_webp=async_task.req_param['use_webp'])
-            new_img = run([source_file], output_file_to_file_path(img_filename), output_file_to_file_path(new_img_filename), provider='cuda')
-            if new_img:
+            target_file = output_file_to_file_path(img_filename)
+            new_img_filename = create_output_file_name()
+            result = swapper.swap_face(
+                source_paths=[source_file],
+                target_path=target_file,
+                output_path=output_file_to_file_path(new_img_filename),
+                provider=DeviceProvider.GPU
+            )
+            try:
+                os.remove(source_file)
+            except Exception as e:
+                print(f"[Fooocus] delete source tmp file error: {e}")
+            if result:
+                try:
+                    os.remove(target_file)
+                except Exception as e:
+                    print(f"[Fooocus] delete target tmp file error: {e}")
                 return new_img_filename
         return img_filename
 
@@ -122,7 +139,7 @@ def process_generate(async_task: QueueTask):
         results = []
         for i, im in enumerate(imgs):
             seed = -1 if len(tasks) == 0 else tasks[i]['task_seed']
-            img_filename = save_output_file(im, use_webp=async_task.req_param['use_webp'])
+            img_filename = save_output_file(im)
             results.append(ImageGenerationResult(im=swap_face(img_filename), seed=str(seed), finish_reason=GenerationFinishReason.success))
         async_task.set_result(results, False)
         worker_queue.finish_task(async_task.job_id)

@@ -13,7 +13,7 @@ os.makedirs(output_dir, exist_ok=True)
 static_serve_base_url = 'http://127.0.0.1:8888/files/'
 
 
-def save_output_file(img: np.ndarray, use_webp: bool = True) -> str:
+def save_output_file(img: np.ndarray, use_webp: bool = False) -> str:
     current_time = datetime.datetime.now()
     date_string = current_time.strftime("%Y-%m-%d")
     if use_webp:
@@ -40,7 +40,7 @@ def delete_output_file(filename: str):
         print(f"Delete output file failed: {filename}")
 
 
-def output_file_to_base64img(filename: str | None, use_webp: bool = True) -> str | None:
+def output_file_to_base64img(filename: str | None, use_webp: bool = False) -> str | None:
     if filename is None:
         return None
     file_path = os.path.join(output_dir, filename)
@@ -58,7 +58,7 @@ def output_file_to_base64img(filename: str | None, use_webp: bool = True) -> str
     return base64_str
 
 
-def output_file_to_bytesimg(filename: str | None, use_webp: bool = True) -> bytes | None:
+def output_file_to_bytesimg(filename: str | None, use_webp: bool = False) -> bytes | None:
     if filename is None:
         return None
     file_path = os.path.join(output_dir, filename)
@@ -90,7 +90,7 @@ def output_file_to_file_path(filename: str | None) -> str | None:
     return file_path
 
 
-def create_output_file_name(use_webp: bool = True) -> str:
+def create_output_file_name(use_webp: bool = False) -> str:
     current_time = datetime.datetime.now()
     date_string = current_time.strftime("%Y-%m-%d")
 
