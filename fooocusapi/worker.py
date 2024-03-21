@@ -16,6 +16,7 @@ from facefusionlib import swapper
 from facefusionlib.swapper import DeviceProvider
 
 worker_queue: TaskQueue = None
+last_model_name = None
 
 def process_top():
     import ldm_patched.modules.model_management
@@ -29,7 +30,7 @@ def task_schedule_loop():
         if len(worker_queue.queue) == 0:
             time.sleep(0.05)
             continue
-
+        
         current_task = worker_queue.queue[0]
         if current_task.start_millis == 0:
             process_generate(current_task)
@@ -104,16 +105,16 @@ def process_generate(async_task: QueueTask):
         print(f'[Fooocus] {text}')
         outputs.append(['preview', (number, text, None)])
 
-    def swap_face(img_filename):
+    def swap_face(img_filename, extension: str):
         source_file = None
         for img_prompt in params.image_prompts:
-            cn_img, cn_stop, cn_weight, cn_type = img_prompt
+            cn_img, _, _, cn_type = img_prompt
             if flags.cn_ip_face == cn_type:
                 source_file = output_file_to_file_path(save_output_file(cn_img))
                 break
         if source_file:
             target_file = output_file_to_file_path(img_filename)
-            new_img_filename = create_output_file_name()
+            new_img_filename = create_output_file_name(extension=extension)
             result = swapper.swap_face(
                 source_paths=[source_file],
                 target_path=target_file,
@@ -132,15 +133,15 @@ def process_generate(async_task: QueueTask):
                 return new_img_filename
         return img_filename
 
-    def yield_result(_, imgs, tasks):
+    def yield_result(_, imgs, tasks, extension='png'):
         if not isinstance(imgs, list):
             imgs = [imgs]
 
         results = []
         for i, im in enumerate(imgs):
             seed = -1 if len(tasks) == 0 else tasks[i]['task_seed']
-            img_filename = save_output_file(im)
-            results.append(ImageGenerationResult(im=swap_face(img_filename), seed=str(seed), finish_reason=GenerationFinishReason.success))
+            img_filename = save_output_file(img=im, extension=extension)
+            results.append(ImageGenerationResult(im=swap_face(img_filename, extension=extension), seed=str(seed), finish_reason=GenerationFinishReason.success))
         async_task.set_result(results, False)
         worker_queue.finish_task(async_task.job_id)
         print(f"[Task Queue] Finish task, job_id={async_task.job_id}")
@@ -150,6 +151,17 @@ def process_generate(async_task: QueueTask):
 
     try:
         print(f"[Task Queue] Task queue start task, job_id={async_task.job_id}")
+        # clear memory
+        global last_model_name
+
+        if last_model_name is None:
+            last_model_name = async_task.req_param.base_model_name
+        if last_model_name != async_task.req_param.base_model_name:
+            model_management.cleanup_models() # key1
+            model_management.unload_all_models()
+            model_management.soft_empty_cache() # key2
+            last_model_name = async_task.req_param.base_model_name
+
         worker_queue.start_task(async_task.job_id)
 
         execution_start_time = time.perf_counter()
@@ -182,6 +194,7 @@ def process_generate(async_task: QueueTask):
         inpaint_input_image = params.inpaint_input_image
         inpaint_additional_prompt = params.inpaint_additional_prompt
         inpaint_mask_image_upload = None
+        save_extension = params.save_extension
 
         if inpaint_additional_prompt is None:
             inpaint_additional_prompt = ''
@@ -579,7 +592,7 @@ def process_generate(async_task: QueueTask):
             if direct_return:
                 d = [('Upscale (Fast)', '2x')]
                 log(uov_input_image, d)
-                yield_result(async_task, uov_input_image, tasks)
+                yield_result(async_task, uov_input_image, tasks, save_extension)
                 return
 
             tiled = True
@@ -725,7 +738,7 @@ def process_generate(async_task: QueueTask):
                 cn_img = HWC3(cn_img)
                 task[0] = core.numpy_to_pytorch(cn_img)
                 if advanced_parameters.debugging_cn_preprocessor:
-                    yield_result(async_task, cn_img, tasks)
+                    yield_result(async_task, cn_img, tasks, save_extension)
                     return
             for task in cn_tasks[flags.cn_cpds]:
                 cn_img, cn_stop, cn_weight = task
@@ -737,7 +750,7 @@ def process_generate(async_task: QueueTask):
                 cn_img = HWC3(cn_img)
                 task[0] = core.numpy_to_pytorch(cn_img)
                 if advanced_parameters.debugging_cn_preprocessor:
-                    yield_result(async_task, cn_img, tasks)
+                    yield_result(async_task, cn_img, tasks, save_extension)
                     return
             for task in cn_tasks[flags.cn_ip]:
                 cn_img, cn_stop, cn_weight = task
@@ -748,7 +761,7 @@ def process_generate(async_task: QueueTask):
 
                 task[0] = ip_adapter.preprocess(cn_img, ip_adapter_path=ip_adapter_path)
                 if advanced_parameters.debugging_cn_preprocessor:
-                    yield_result(async_task, cn_img, tasks)
+                    yield_result(async_task, cn_img, tasks, save_extension)
                     return
             for task in cn_tasks[flags.cn_ip_face]:
                 cn_img, cn_stop, cn_weight = task
@@ -762,7 +775,7 @@ def process_generate(async_task: QueueTask):
 
                 task[0] = ip_adapter.preprocess(cn_img, ip_adapter_path=ip_adapter_face_path)
                 if advanced_parameters.debugging_cn_preprocessor:
-                    yield_result(async_task, cn_img, tasks)
+                    yield_result(async_task, cn_img, tasks, save_extension)
                     return
 
             all_ip_tasks = cn_tasks[flags.cn_ip] + cn_tasks[flags.cn_ip_face]
@@ -909,7 +922,7 @@ def process_generate(async_task: QueueTask):
         if async_task.finish_with_error:
             worker_queue.finish_task(async_task.job_id)
             return async_task.task_result
-        yield_result(None, results, tasks)
+        yield_result(None, results, tasks, save_extension)
         return
     except Exception as e:
         print('Worker error:', e)
