@@ -5,6 +5,11 @@ import os
 import numpy as np
 from PIL import Image
 import uuid
+import json
+from pathlib import Path
+from PIL.PngImagePlugin import PngInfo
+
+
 
 output_dir = os.path.abspath(os.path.join(
     os.path.dirname(__file__), '..', 'outputs', 'files'))
@@ -13,21 +18,41 @@ os.makedirs(output_dir, exist_ok=True)
 static_serve_base_url = 'http://127.0.0.1:8888/files/'
 
 
-def save_output_file(img: np.ndarray, use_webp: bool = False) -> str:
+def save_output_file(img: np.ndarray, image_meta: dict = None,
+                     image_name: str = '', extension: str = 'png') -> str:
+    """
+    Save np image to file
+    Args:
+        img: np.ndarray image to save
+        image_meta: dict of image metadata
+        image_name: str of image name
+        extension: str of image extension
+    Returns:
+        str of file name
+    """
     current_time = datetime.datetime.now()
     date_string = current_time.strftime("%Y-%m-%d")
-    if use_webp:
-        ext = '.webp'
-        format_type = 'webp'
-    else:
-        ext = '.png'
-        format_type = 'PNG'
-    filename = os.path.join(date_string, str(uuid.uuid4()) + ext)
+
+    image_name = str(uuid.uuid4()) if image_name == '' else image_name
+
+    filename = os.path.join(date_string, image_name + '.' + extension)
     file_path = os.path.join(output_dir, filename)
 
+    if extension not in ['png', 'jpg', 'webp']:
+        extension = 'png'
+
+    if image_meta is None:
+        image_meta = {}
+
+    meta = None
+    if extension == 'png':
+        meta = PngInfo()
+        meta.add_text("params", json.dumps(image_meta))
+
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
-    Image.fromarray(img).save(file_path, format=format_type)
-    return filename
+    Image.fromarray(img).save(file_path, format=extension,
+                              pnginfo=meta, optimize=True)
+    return Path(filename).as_posix()
 
 
 def delete_output_file(filename: str):
@@ -40,37 +65,31 @@ def delete_output_file(filename: str):
         print(f"Delete output file failed: {filename}")
 
 
-def output_file_to_base64img(filename: str | None, use_webp: bool = False) -> str | None:
+def output_file_to_base64img(filename: str | None) -> str | None:
     if filename is None:
         return None
     file_path = os.path.join(output_dir, filename)
     if not os.path.exists(file_path) or not os.path.isfile(file_path):
         return None
-    if use_webp:
-        format_type = 'webp'
-    else:
-        format_type = 'PNG'
+
     img = Image.open(file_path)
     output_buffer = BytesIO()
-    img.save(output_buffer, format=format_type)
+    img.save(output_buffer, format='PNG')
     byte_data = output_buffer.getvalue()
     base64_str = base64.b64encode(byte_data)
     return base64_str
 
 
-def output_file_to_bytesimg(filename: str | None, use_webp: bool = False) -> bytes | None:
+def output_file_to_bytesimg(filename: str | None) -> bytes | None:
     if filename is None:
         return None
     file_path = os.path.join(output_dir, filename)
     if not os.path.exists(file_path) or not os.path.isfile(file_path):
         return None
-    if use_webp:
-        format_type = 'webp'
-    else:
-        format_type = 'PNG'
+
     img = Image.open(file_path)
     output_buffer = BytesIO()
-    img.save(output_buffer, format=format_type)
+    img.save(output_buffer, format='PNG')
     byte_data = output_buffer.getvalue()
     return byte_data
 
