@@ -105,16 +105,16 @@ def process_generate(async_task: QueueTask):
         print(f'[Fooocus] {text}')
         outputs.append(['preview', (number, text, None)])
 
-    def swap_face(img_filename):
+    def swap_face(img_filename, extension: str):
         source_file = None
         for img_prompt in params.image_prompts:
-            cn_img, cn_stop, cn_weight, cn_type = img_prompt
+            cn_img, _, _, cn_type = img_prompt
             if flags.cn_ip_face == cn_type:
                 source_file = output_file_to_file_path(save_output_file(cn_img))
                 break
         if source_file:
             target_file = output_file_to_file_path(img_filename)
-            new_img_filename = create_output_file_name()
+            new_img_filename = create_output_file_name(extension=extension)
             result = swapper.swap_face(
                 source_paths=[source_file],
                 target_path=target_file,
@@ -141,7 +141,7 @@ def process_generate(async_task: QueueTask):
         for i, im in enumerate(imgs):
             seed = -1 if len(tasks) == 0 else tasks[i]['task_seed']
             img_filename = save_output_file(img=im, extension=extension)
-            results.append(ImageGenerationResult(im=swap_face(img_filename), seed=str(seed), finish_reason=GenerationFinishReason.success))
+            results.append(ImageGenerationResult(im=swap_face(img_filename, extension=extension), seed=str(seed), finish_reason=GenerationFinishReason.success))
         async_task.set_result(results, False)
         worker_queue.finish_task(async_task.job_id)
         print(f"[Task Queue] Finish task, job_id={async_task.job_id}")

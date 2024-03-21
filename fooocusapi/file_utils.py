@@ -109,17 +109,18 @@ def output_file_to_file_path(filename: str | None) -> str | None:
     return file_path
 
 
-def create_output_file_name(use_webp: bool = False) -> str:
+def create_output_file_name(image_name: str = '', extension: str = 'png') -> str:
     current_time = datetime.datetime.now()
     date_string = current_time.strftime("%Y-%m-%d")
 
-    if use_webp:
-        ext = '.webp'
-    else:
-        ext = '.png'
-    filename = os.path.join(date_string, str(uuid.uuid4()) + ext)
+    image_name = str(uuid.uuid4()) if image_name == '' else image_name
+
+    if extension not in ['png', 'jpg', 'webp']:
+        extension = 'png'
+
+    filename = os.path.join(date_string, image_name + '.' + extension)
     file_path = os.path.join(output_dir, filename)
 
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
     open(file_path, 'x')
-    return filename
+    return Path(filename).as_posix()
